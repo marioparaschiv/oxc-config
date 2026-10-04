@@ -1,0 +1,7 @@
+{
+	"extends": [
+		"./node_modules/@marioparaschiv/oxc-config/base.json",
+		"./node_modules/@marioparaschiv/oxc-config/react.json",
+		"./node_modules/@marioparaschiv/oxc-config/jsdoc.json"
+	]
+}

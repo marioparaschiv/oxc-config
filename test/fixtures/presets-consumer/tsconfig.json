@@ -1,0 +1,11 @@
+{
+	"compilerOptions": {
+		"target": "ES2024",
+		"module": "NodeNext",
+		"moduleResolution": "NodeNext",
+		"jsx": "preserve",
+		"strict": true,
+		"noEmit": true
+	},
+	"include": ["src"]
+}

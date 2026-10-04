@@ -1,0 +1,65 @@
+{
+	"name": "@marioparaschiv/oxc-config",
+	"version": "0.0.0",
+	"description": "Shared oxlint and oxfmt configuration with custom lint rules",
+	"license": "MIT",
+	"repository": {
+		"type": "git",
+		"url": "git+https://github.com/marioparaschiv/oxc-config.git"
+	},
+	"bin": {
+		"oxc-config-check": "./bin/oxc-config-check.mjs",
+		"oxc-config-hook": "./bin/oxc-config-hook.mjs"
+	},
+	"files": [
+		"base.json",
+		"react.json",
+		"jsdoc.json",
+		"plugin.mjs",
+		"commitlint.mjs",
+		"oxfmtrc.json",
+		"bin",
+		"lib"
+	],
+	"type": "module",
+	"exports": {
+		"./base.json": "./base.json",
+		"./react.json": "./react.json",
+		"./jsdoc.json": "./jsdoc.json",
+		"./plugin": "./plugin.mjs",
+		"./commitlint": "./commitlint.mjs",
+		"./oxfmtrc.json": "./oxfmtrc.json",
+		"./package.json": "./package.json"
+	},
+	"publishConfig": {
+		"access": "public"
+	},
+	"scripts": {
+		"prepare": "lefthook install --reset-hooks-path",
+		"lint": "oxlint --type-aware --disable-nested-config",
+		"format": "oxfmt -c oxfmtrc.json",
+		"format:check": "oxfmt -c oxfmtrc.json --check",
+		"check": "node bin/oxc-config-check.mjs base.json react.json jsdoc.json .oxlintrc.json",
+		"test": "vitest run"
+	},
+	"dependencies": {
+		"@commitlint/cli": "21.0.2",
+		"@commitlint/config-angular": "21.0.2",
+		"@stylistic/eslint-plugin": "^5.10.0",
+		"eslint-plugin-jsdoc": "^64.5.4",
+		"eslint-plugin-perfectionist": "^5.9.1",
+		"eslint-plugin-unicorn": "^76.0.0"
+	},
+	"devDependencies": {
+		"lefthook": "2.1.9",
+		"oxfmt": "^0.71.0",
+		"oxlint": "^1.86.0",
+		"oxlint-tsgolint": "^7.0.2003",
+		"vitest": "^5.0.3"
+	},
+	"peerDependencies": {
+		"oxfmt": ">=0.55.0",
+		"oxlint": "^1.70.0",
+		"oxlint-tsgolint": ">=0.23.0"
+	}
+}
