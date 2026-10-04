@@ -945,6 +945,8 @@ const noForeach = {
 
 const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
+const filePath = (context) => context.filename.replaceAll('\\', '/');
+
 // `*` stands for one path segment, so `apps/*/src` names the source root of every app.
 // The pattern may sit anywhere in the path; group 1 captures everything up to its end.
 function directoryPattern(glob) {
@@ -1012,7 +1014,7 @@ const noCrossDomainInternals = {
 			internals,
 			composable = [],
 		} = requireOptions(context, 'no-cross-domain-internals');
-		const path = context.filename.replaceAll('\\', '/');
+		const path = filePath(context);
 		const match = findRoot(path, domainRoots);
 
 		if (!match) {
@@ -1069,7 +1071,7 @@ const kebabCaseFilename = {
 		},
 	},
 	create(context) {
-		const path = context.filename.replaceAll('\\', '/');
+		const path = filePath(context);
 		const basename = path.slice(path.lastIndexOf('/') + 1);
 		const [name, ...rest] = basename.split('.');
 
@@ -1144,7 +1146,7 @@ const consistentImportPaths = {
 			aliasRoots,
 			relativeRoots = [],
 		} = requireOptions(context, 'consistent-import-paths');
-		const path = context.filename.replaceAll('\\', '/');
+		const path = filePath(context);
 		const relativeMatch = findRoot(path, relativeRoots);
 		const aliasMatch = relativeMatch ? null : findRoot(path, aliasRoots);
 
@@ -1353,7 +1355,7 @@ const noRawDatabaseAccess = {
 	},
 	create(context) {
 		const { schemas, allowedIn } = requireOptions(context, 'no-raw-database-access');
-		const path = context.filename.replaceAll('\\', '/');
+		const path = filePath(context);
 
 		if (findRoot(path, allowedIn) || TEST_FILE.test(path)) {
 			return {};
