@@ -153,7 +153,8 @@ it('fixes what it can on stop and blocks with the remaining lint errors', () => 
 	const { decision, reason } = JSON.parse(stop());
 
 	expect(decision).toBe('block');
-	expect(reason).toContain('src/broken.ts:2:2: error eslint(no-debugger)');
+	expect(reason).toContain('src/broken.ts:2:2:');
+	expect(reason).toContain('[Error/eslint(no-debugger)]');
 	expect(reason).not.toContain('padding-line-between-statements');
 	expect(read('src/broken.ts')).toBe(WITH_ERROR);
 });
@@ -172,7 +173,8 @@ it('skips files matched by the repository ignorePatterns on stop', () => {
 	const { decision, reason } = JSON.parse(stop());
 
 	expect(decision).toBe('block');
-	expect(reason).toContain('src/broken.ts:2:2: error eslint(no-debugger)');
+	expect(reason).toContain('src/broken.ts:2:2:');
+	expect(reason).toContain('[Error/eslint(no-debugger)]');
 	expect(reason).not.toContain('schema.gen.ts');
 });
 
@@ -185,6 +187,7 @@ it('lints with the ratchet config when given, still honouring the repository ign
 	const { decision, reason } = JSON.parse(stop(['--ratchet', 'ratchet.json']));
 
 	expect(decision).toBe('block');
-	expect(reason).toContain('src/logged.ts:2:2: error eslint(no-console)');
+	expect(reason).toContain('src/logged.ts:2:2:');
+	expect(reason).toContain('[Error/eslint(no-console)]');
 	expect(reason).not.toContain('logged.gen.ts');
 });

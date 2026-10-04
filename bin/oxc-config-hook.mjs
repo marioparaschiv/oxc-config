@@ -138,6 +138,8 @@ function onStop(root, transcriptPath) {
 		'oxlint',
 		[
 			'--type-aware',
+			// The default format changes when oxlint detects an agent; `unix` prints nothing when clean.
+			'--format=unix',
 			'--fix',
 			'--no-error-on-unmatched-pattern',
 			...lintConfigArgs(root),
