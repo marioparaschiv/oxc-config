@@ -17,7 +17,16 @@ afterAll(() => {
 });
 
 function lintMessage(message) {
-	return spawnBin('@commitlint/cli', [], { cwd: consumer, input: message }, 'commitlint');
+	return spawnBin(
+		'@commitlint/cli',
+		[],
+		{
+			cwd: consumer,
+			env: { ...process.env, NO_COLOR: '1' },
+			input: message,
+		},
+		'commitlint',
+	);
 }
 
 it('rejects a message without a type', () => {
