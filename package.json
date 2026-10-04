@@ -8,16 +8,22 @@
 		"url": "git+https://github.com/marioparaschiv/oxc-config.git"
 	},
 	"bin": {
-		"oxc-config-check": "./bin/oxc-config-check.mjs"
+		"oxc-config-check": "./bin/oxc-config-check.mjs",
+		"oxc-config-hook": "./bin/oxc-config-hook.mjs"
 	},
 	"files": [
 		"base.json",
+		"react.json",
+		"jsdoc.json",
 		"plugin.mjs",
-		"bin"
+		"bin",
+		"lib"
 	],
 	"type": "module",
 	"exports": {
 		"./base.json": "./base.json",
+		"./react.json": "./react.json",
+		"./jsdoc.json": "./jsdoc.json",
 		"./plugin": "./plugin.mjs",
 		"./package.json": "./package.json"
 	},

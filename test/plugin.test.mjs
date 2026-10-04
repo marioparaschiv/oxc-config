@@ -1,5 +1,5 @@
 import { RuleTester } from 'oxlint/plugins-dev';
-import { describe, it } from 'vitest';
+import { describe, expect, it } from 'vitest';
 
 import plugin from '../plugin.mjs';
 
@@ -7,6 +7,26 @@ RuleTester.describe = describe;
 RuleTester.it = it;
 
 const ruleTester = new RuleTester();
+
+const withOptions = (options, cases) =>
+	cases.map((testCase) => ({ ...testCase, options: [options] }));
+
+const TELECORD_DATABASE = {
+	schemas: '@telecord/db/schemas',
+	allowedIn: ['packages/db/src', 'packages/test-utils/src'],
+};
+
+const TELECORD_DOMAINS = {
+	domainRoots: ['packages/shared/src'],
+	internals: ['schemas', 'lib', 'types'],
+	composable: ['schemas'],
+};
+
+const TELECORD_IMPORTS = {
+	alias: '~/',
+	aliasRoots: ['apps/*/src'],
+	relativeRoots: ['packages/*/src'],
+};
 
 const WEB_CONTROL_MODULE = 'apps/web/src/components/form/controls/a.tsx';
 
@@ -18,7 +38,7 @@ const REPOSITORY_MODULE = 'packages/db/src/repositories/origins.ts';
 const CLIENT_FACTORY_MODULE = 'apps/search-indexer/src/lib/database.ts';
 
 ruleTester.run('no-raw-database-access', plugin.rules['no-raw-database-access'], {
-	valid: [
+	valid: withOptions(TELECORD_DATABASE, [
 		{ code: "import { eq } from 'drizzle-orm';", filename: REPOSITORY_MODULE },
 		{ code: "import { origins } from '@telecord/db/schemas';", filename: REPOSITORY_MODULE },
 		{ code: "import origins from '@telecord/db/repositories/origins';", filename: APP_MODULE },
@@ -46,12 +66,17 @@ ruleTester.run('no-raw-database-access', plugin.rules['no-raw-database-access'],
 			code: "import { origins } from '@telecord/db/schemas';",
 			filename: 'packages/test-utils/src/seed.ts',
 		},
-	],
-	invalid: [
+	]),
+	invalid: withOptions(TELECORD_DATABASE, [
 		{
 			code: "import { eq } from 'drizzle-orm';",
 			filename: APP_MODULE,
-			errors: [{ messageId: 'builder' }],
+			errors: [
+				{
+					message:
+						'Import `drizzle-orm` only inside `packages/db/src` or `packages/test-utils/src` - a query belongs on a repository, and a caller joins one by passing an `Executor` (AGENTS.md).',
+				},
+			],
 		},
 		{
 			code: "import { and, inArray } from 'drizzle-orm';",
@@ -73,11 +98,41 @@ ruleTester.run('no-raw-database-access', plugin.rules['no-raw-database-access'],
 			filename: 'apps/media/scripts/compress-status.ts',
 			errors: [{ messageId: 'builder' }],
 		},
-	],
+	]),
 });
 
+ruleTester.run(
+	'no-raw-database-access in a single-package layout',
+	plugin.rules['no-raw-database-access'],
+	{
+		valid: withOptions({ schemas: '~/db/schema', allowedIn: ['src/db'] }, [
+			{ code: "import { eq } from 'drizzle-orm';", filename: 'src/db/queries/users.ts' },
+			{ code: "import { users } from '~/db/schema';", filename: 'src/db/queries/users.ts' },
+			{ code: "import { users } from '~/db/schemata';", filename: 'src/routes/users.ts' },
+			{ code: "import { users } from '~/db/schema';", filename: 'src/routes/users.test.ts' },
+		]),
+		invalid: withOptions({ schemas: '~/db/schema', allowedIn: ['src/db'] }, [
+			{
+				code: "import { eq } from 'drizzle-orm';",
+				filename: 'src/routes/users.ts',
+				errors: [{ messageId: 'builder' }],
+			},
+			{
+				code: "import { users } from '~/db/schema/users';",
+				filename: 'src/routes/users.ts',
+				errors: [
+					{
+						message:
+							'Import `~/db/schema` only inside `src/db` - reach a table through its repository rather than building the query here (AGENTS.md).',
+					},
+				],
+			},
+		]),
+	},
+);
+
 ruleTester.run('no-cross-domain-internals', plugin.rules['no-cross-domain-internals'], {
-	valid: [
+	valid: withOptions(TELECORD_DOMAINS, [
 		{ code: "import { MessageSchema } from '../entities';", filename: DOMAIN_MODULE },
 		{ code: "import { POSTER_SUFFIX } from './constants';", filename: DOMAIN_MODULE },
 		{ code: "import { MessageSchema } from '../entities/schemas';", filename: SCHEMAS_MODULE },
@@ -86,12 +141,17 @@ ruleTester.run('no-cross-domain-internals', plugin.rules['no-cross-domain-intern
 			code: "import { MessageSchema } from '../entities/schemas';",
 			filename: 'apps/web/src/main.ts',
 		},
-	],
-	invalid: [
+	]),
+	invalid: withOptions(TELECORD_DOMAINS, [
 		{
 			code: "import { MessageSchema } from '../entities/schemas';",
 			filename: DOMAIN_MODULE,
-			errors: [{ messageId: 'internals' }],
+			errors: [
+				{
+					message:
+						"Import a domain through its index (`../entities`), never its internals (`../entities/schemas`) - the index is the domain's public API (AGENTS.md).",
+				},
+			],
 		},
 		{
 			code: "import Identifier from '../entities/lib';",
@@ -106,14 +166,71 @@ ruleTester.run('no-cross-domain-internals', plugin.rules['no-cross-domain-intern
 		{
 			code: "import Identifier from '../entities/lib';",
 			filename: SCHEMAS_MODULE,
-			errors: [{ messageId: 'internalsFromSchemas' }],
+			errors: [
+				{
+					message:
+						"Import a domain through its index (`../entities`), never its `lib`/`types` - a `schemas` module may only compose another domain's `schemas` (AGENTS.md).",
+				},
+			],
 		},
 		{
 			code: "import type { ExitMeta } from '../process/types';",
 			filename: SCHEMAS_MODULE,
-			errors: [{ messageId: 'internalsFromSchemas' }],
+			errors: [{ messageId: 'composedInternals' }],
 		},
-	],
+	]),
+});
+
+const LIBRARY_DOMAINS = {
+	domainRoots: ['libs/*/src'],
+	internals: ['model', 'impl'],
+	composable: ['model'],
+};
+
+ruleTester.run(
+	'no-cross-domain-internals in a multi-library layout',
+	plugin.rules['no-cross-domain-internals'],
+	{
+		valid: withOptions(LIBRARY_DOMAINS, [
+			{ code: "import { User } from '../users';", filename: 'libs/core/src/billing/impl.ts' },
+			{
+				code: "import { User } from '../users/model';",
+				filename: 'libs/core/src/billing/model.ts',
+			},
+			{
+				code: "import { User } from '../users/schemas';",
+				filename: 'libs/core/src/billing/impl.ts',
+			},
+			{
+				code: "import { User } from '../users/model';",
+				filename: 'packages/core/src/billing/impl.ts',
+			},
+		]),
+		invalid: withOptions(LIBRARY_DOMAINS, [
+			{
+				code: "import { User } from '../users/model';",
+				filename: 'libs/core/src/billing/impl.ts',
+				errors: [{ messageId: 'internals' }],
+			},
+			{
+				code: "import { charge } from '../payments/impl';",
+				filename: 'libs/web/src/billing/model.ts',
+				errors: [{ messageId: 'composedInternals' }],
+			},
+		]),
+	},
+);
+
+it('requires options on every layout rule', () => {
+	for (const rule of [
+		'consistent-import-paths',
+		'no-cross-domain-internals',
+		'no-raw-database-access',
+	]) {
+		expect(() => plugin.rules[rule].create({ options: [], filename: 'src/a.ts' })).toThrow(
+			`oxc-config/${rule} needs an options object describing the repository layout.`,
+		);
+	}
 });
 
 const TS_MODULE = 'packages/shared/src/entities/lib.ts';
@@ -349,19 +466,24 @@ ruleTester.run('kebab-case-filename', plugin.rules['kebab-case-filename'], {
 });
 
 ruleTester.run('consistent-import-paths', plugin.rules['consistent-import-paths'], {
-	valid: [
+	valid: withOptions(TELECORD_IMPORTS, [
 		{ code: "import a from './sibling';", filename: WEB_CONTROL_MODULE },
 		{ code: "import a from '~/lib/utils';", filename: WEB_CONTROL_MODULE },
 		{ code: "import a from 'react';", filename: WEB_CONTROL_MODULE },
 		{ code: "import a from '../entities';", filename: DOMAIN_MODULE },
 		{ code: "import a from './constants';", filename: DOMAIN_MODULE },
 		{ code: "import a from '../cache';", filename: 'packages/db/src/managers/users.ts' },
-	],
-	invalid: [
+	]),
+	invalid: withOptions(TELECORD_IMPORTS, [
 		{
 			code: "import a from '../context';",
 			filename: WEB_CONTROL_MODULE,
-			errors: [{ messageId: 'parent' }],
+			errors: [
+				{
+					message:
+						'Import across directories with `~/` (`~/components/form/context`), never `../` - `./` is for siblings only (AGENTS.md).',
+				},
+			],
 			output: "import a from '~/components/form/context';",
 		},
 		{
@@ -373,15 +495,42 @@ ruleTester.run('consistent-import-paths', plugin.rules['consistent-import-paths'
 		{
 			code: "import a from '~/entities';",
 			filename: DOMAIN_MODULE,
-			errors: [{ messageId: 'packageAlias' }],
+			errors: [
+				{
+					message:
+						'A `packages/*/src` is consumed from source, so `~/` resolves against the consuming package - use a relative import (AGENTS.md).',
+				},
+			],
 		},
 		{
 			code: "import a from '~/cache';",
 			filename: 'packages/db/src/managers/users.ts',
 			errors: [{ messageId: 'packageAlias' }],
 		},
-	],
+	]),
 });
+
+const SINGLE_APP_IMPORTS = { alias: '@/', aliasRoots: ['src'] };
+
+ruleTester.run(
+	'consistent-import-paths in a single-app layout',
+	plugin.rules['consistent-import-paths'],
+	{
+		valid: withOptions(SINGLE_APP_IMPORTS, [
+			{ code: "import a from './sibling';", filename: 'src/components/button.tsx' },
+			{ code: "import a from '@/lib/utils';", filename: 'src/components/button.tsx' },
+			{ code: "import a from '../config';", filename: 'scripts/seed/run.ts' },
+		]),
+		invalid: withOptions(SINGLE_APP_IMPORTS, [
+			{
+				code: "import a from '../../lib/utils';",
+				filename: 'src/components/forms/input.tsx',
+				errors: [{ messageId: 'parent' }],
+				output: "import a from '@/lib/utils';",
+			},
+		]),
+	},
+);
 
 ruleTester.run('jsdoc-summary-only', plugin.rules['jsdoc-summary-only'], {
 	valid: [

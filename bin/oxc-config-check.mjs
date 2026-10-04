@@ -2,12 +2,10 @@
 // oxlint silently ignores unknown rule names while linting, so a typo'd rule is dead config.
 // `--print-config` resolves every rule against its plugin and rejects the config instead.
 import { spawnSync } from 'node:child_process';
-import { createRequire } from 'node:module';
-import { dirname, join } from 'node:path';
 
-const require = createRequire(import.meta.url);
-const manifestPath = require.resolve('oxlint/package.json');
-const oxlint = join(dirname(manifestPath), require(manifestPath).bin.oxlint);
+import { resolveBin } from '../lib/resolve-bin.mjs';
+
+const oxlint = resolveBin('oxlint');
 
 const configs = process.argv.length > 2 ? process.argv.slice(2) : ['.oxlintrc.json'];
 

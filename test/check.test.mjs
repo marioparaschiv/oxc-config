@@ -8,8 +8,8 @@ const check = join(root, 'bin/oxc-config-check.mjs');
 const runCheck = (cwd, configs) =>
 	spawnSync(process.execPath, [check, ...configs], { cwd, encoding: 'utf8' });
 
-it('accepts base.json', () => {
-	expect(runCheck(root, ['base.json']).status).toBe(0);
+it('accepts every preset', () => {
+	expect(runCheck(root, ['base.json', 'react.json', 'jsdoc.json']).status).toBe(0);
 });
 
 it('rejects a config naming an unknown rule with the oxlint diagnostic', () => {

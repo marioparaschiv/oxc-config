@@ -1,0 +1,25 @@
+{
+	"jsPlugins": [
+		{ "name": "oxc-config", "specifier": "./plugin.mjs" },
+		{ "name": "jsdoc-js", "specifier": "eslint-plugin-jsdoc" }
+	],
+	"rules": {
+		"oxc-config/jsdoc-summary-only": "error",
+		"jsdoc-js/require-jsdoc": [
+			"error",
+			{
+				"publicOnly": { "ancestorsOnly": true },
+				"require": {
+					"FunctionDeclaration": true,
+					"ArrowFunctionExpression": true,
+					"FunctionExpression": true
+				}
+			}
+		],
+		"jsdoc-js/require-param": [
+			"error",
+			{ "checkDestructured": false, "ignoreWhenAllParamsMissing": true }
+		],
+		"jsdoc-js/require-returns": ["error", { "publicOnly": { "ancestorsOnly": true } }]
+	}
+}

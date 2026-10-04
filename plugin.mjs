@@ -941,41 +941,111 @@ const noForeach = {
 	},
 };
 
-const SHARED_SOURCE_DIRECTORY = 'packages/shared/src/';
+const escapeRegExp = (text) => text.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
-const DOMAIN_INTERNALS = /^\.\.\/[a-z-]+\/(schemas|lib|types)$/;
+// `*` stands for one path segment, so `apps/*/src` names the source root of every app.
+// The pattern may sit anywhere in the path; group 1 captures everything up to its end.
+function directoryPattern(glob) {
+	const body = escapeRegExp(glob.replace(/^\/+|\/+$/g, '')).replaceAll('\\*', '[^/]+');
 
-// A `schemas.ts` may compose another domain's schemas, the only non-circular option.
-const DOMAIN_INTERNALS_FROM_SCHEMAS = /^\.\.\/[a-z-]+\/(lib|types)$/;
+	return new RegExp(`^(.*?(?:^|/)${body})/`);
+}
 
-const isSharedSchemasModule = (path) => /packages\/shared\/src\/[^/]+\/schemas\.ts$/.test(path);
+function findRoot(path, globs) {
+	for (const glob of globs) {
+		const root = directoryPattern(glob).exec(path)?.[1];
+
+		if (root) {
+			return { glob, root };
+		}
+	}
+
+	return null;
+}
+
+const DIRECTORY_PATTERNS = { type: 'array', items: { type: 'string', minLength: 1 } };
+
+const MODULE_NAMES = { type: 'array', items: { type: 'string', pattern: '^[^/]+$' } };
+
+// A layout rule has no meaningful default, so running one unconfigured is a config mistake.
+function requireOptions(context, rule) {
+	const [options] = context.options;
+
+	if (!options) {
+		throw new Error(
+			`oxc-config/${rule} needs an options object describing the repository layout.`,
+		);
+	}
+
+	return options;
+}
+
+const formatNames = (names) => names.map((name) => `\`${name}\``).join('/');
 
 const noCrossDomainInternals = {
 	meta: {
 		type: 'problem',
+		schema: [
+			{
+				type: 'object',
+				properties: {
+					domainRoots: DIRECTORY_PATTERNS,
+					internals: { ...MODULE_NAMES, minItems: 1 },
+					composable: MODULE_NAMES,
+				},
+				required: ['domainRoots', 'internals'],
+				additionalProperties: false,
+			},
+		],
 		messages: {
 			internals:
-				"Import a domain through its index (`../entities`), never its internals (`../entities/schemas`) - the index is the domain's public API (AGENTS.md).",
-			internalsFromSchemas:
-				"Import a domain through its index (`../process`), never its `lib`/`types` - a `schemas.ts` may only compose another domain's `schemas` (AGENTS.md).",
+				"Import a domain through its index (`{{index}}`), never its internals (`{{source}}`) - the index is the domain's public API (AGENTS.md).",
+			composedInternals:
+				"Import a domain through its index (`{{index}}`), never its {{banned}} - a `{{module}}` module may only compose another domain's `{{module}}` (AGENTS.md).",
 		},
 	},
 	create(context) {
+		const {
+			domainRoots,
+			internals,
+			composable = [],
+		} = requireOptions(context, 'no-cross-domain-internals');
 		const path = context.filename.replaceAll('\\', '/');
+		const match = findRoot(path, domainRoots);
 
-		if (!path.includes(SHARED_SOURCE_DIRECTORY)) {
+		if (!match) {
 			return {};
 		}
 
-		const composesSchemas = isSharedSchemasModule(path);
-		const banned = composesSchemas ? DOMAIN_INTERNALS_FROM_SCHEMAS : DOMAIN_INTERNALS;
-		const messageId = composesSchemas ? 'internalsFromSchemas' : 'internals';
+		// A module directly inside a domain, named after a composable internal, may import
+		// the same internal from another domain - the only non-circular way to compose them.
+		const [domainFile, ...nested] = path
+			.slice(match.root.length + 1)
+			.split('/')
+			.slice(1);
+		const module = nested.length === 0 ? domainFile?.replace(/\.[^.]+$/, '') : undefined;
+		const composes = composable.includes(module);
+		const banned = composes ? internals.filter((name) => name !== module) : internals;
+		const pattern = new RegExp(`^\\.\\./[^/.]+/(${banned.map(escapeRegExp).join('|')})$`);
 
 		return {
 			ImportDeclaration(node) {
-				if (banned.test(node.source.value)) {
-					context.report({ node: node.source, messageId });
+				const source = node.source.value;
+
+				if (!pattern.test(source)) {
+					return;
 				}
+
+				context.report({
+					node: node.source,
+					messageId: composes ? 'composedInternals' : 'internals',
+					data: {
+						index: source.slice(0, source.lastIndexOf('/')),
+						source,
+						banned: formatNames(banned),
+						module,
+					},
+				});
 			},
 		};
 	},
@@ -1030,12 +1100,6 @@ const kebabCaseFilename = {
 	},
 };
 
-// Only an app owns its own compilation. Every `packages/*` is consumed from
-// source, so a `~/` inside one resolves against the consuming package instead.
-const APPLICATION_SOURCE = /^(.*?\/apps\/[^/]+\/src)\//;
-
-const isPackageSource = (path) => /\/packages\/[^/]+\/src\//.test(path);
-
 const resolveImport = (fromDirectory, specifier) => {
 	const segments = fromDirectory.split('/');
 
@@ -1054,14 +1118,33 @@ const consistentImportPaths = {
 	meta: {
 		type: 'problem',
 		fixable: 'code',
+		schema: [
+			{
+				type: 'object',
+				properties: {
+					alias: { type: 'string', pattern: '/$' },
+					aliasRoots: DIRECTORY_PATTERNS,
+					relativeRoots: DIRECTORY_PATTERNS,
+				},
+				required: ['alias', 'aliasRoots'],
+				additionalProperties: false,
+			},
+		],
 		messages: {
-			parent: 'Import across directories with `~/` (`{{expected}}`), never `../` - `./` is for siblings only (AGENTS.md).',
+			parent: 'Import across directories with `{{alias}}` (`{{expected}}`), never `../` - `./` is for siblings only (AGENTS.md).',
 			packageAlias:
-				'A `packages/*` is consumed from source, so `~/` resolves against the consuming package - use a relative import (AGENTS.md).',
+				'A `{{glob}}` is consumed from source, so `{{alias}}` resolves against the consuming package - use a relative import (AGENTS.md).',
 		},
 	},
 	create(context) {
+		const {
+			alias,
+			aliasRoots,
+			relativeRoots = [],
+		} = requireOptions(context, 'consistent-import-paths');
 		const path = context.filename.replaceAll('\\', '/');
+		const relativeMatch = findRoot(path, relativeRoots);
+		const aliasMatch = relativeMatch ? null : findRoot(path, aliasRoots);
 
 		const check = (node) => {
 			const source = node.source;
@@ -1072,36 +1155,35 @@ const consistentImportPaths = {
 
 			const specifier = source.value;
 
-			if (isPackageSource(path)) {
-				if (specifier.startsWith('~/')) {
-					context.report({ node: source, messageId: 'packageAlias' });
+			if (relativeMatch) {
+				if (specifier.startsWith(alias)) {
+					context.report({
+						node: source,
+						messageId: 'packageAlias',
+						data: { alias, glob: relativeMatch.glob },
+					});
 				}
 
 				return;
 			}
 
-			if (!specifier.startsWith('../')) {
+			if (!aliasMatch || !specifier.startsWith('../')) {
 				return;
 			}
 
-			const root = APPLICATION_SOURCE.exec(path)?.[1];
-
-			if (!root) {
-				return;
-			}
-
+			const { root } = aliasMatch;
 			const resolved = resolveImport(path.slice(0, path.lastIndexOf('/')), specifier);
 
 			if (!resolved.startsWith(`${root}/`)) {
 				return;
 			}
 
-			const expected = `~/${resolved.slice(root.length + 1)}`;
+			const expected = `${alias}${resolved.slice(root.length + 1)}`;
 
 			context.report({
 				node: source,
 				messageId: 'parent',
-				data: { expected },
+				data: { alias, expected },
 				fix: (fixer) => fixer.replaceText(source, `'${expected}'`),
 			});
 		};
@@ -1225,20 +1307,11 @@ const jsdocSummaryOnly = {
 	},
 };
 
-// `packages/db` owns every query; the check keys on the path so a repository
-// under it is exempt while an app importing the same module is not.
-const DATABASE_PACKAGE_SOURCE = '/packages/db/src/';
-
-// Seeding and fixtures write arbitrary tables by design, and only ever run
-// against the throwaway containers `tests/docker-setup.ts` brings up.
-const DATABASE_FIXTURE_SOURCE = '/packages/test-utils/src/';
-
 // A test asserts against stored rows, which is the one place reading a table
 // directly is the point rather than a leak.
 const TEST_FILE = /(^|\/)tests\/|\.test\.[cm]?tsx?$/;
 
 const DRIZZLE_QUERY_BUILDER = /^drizzle-orm(\/|$)/;
-const DATABASE_SCHEMAS = /^@telecord\/db\/schemas(\/|$)/;
 
 // A driver entrypoint exports only the `drizzle()` constructor, so importing one
 // builds a client rather than expressing a query. That is how the search indexer
@@ -1259,23 +1332,34 @@ const isNamespaceImport = (node) =>
 const noRawDatabaseAccess = {
 	meta: {
 		type: 'problem',
+		schema: [
+			{
+				type: 'object',
+				properties: {
+					schemas: { type: 'string', minLength: 1 },
+					allowedIn: { ...DIRECTORY_PATTERNS, minItems: 1 },
+				},
+				required: ['schemas', 'allowedIn'],
+				additionalProperties: false,
+			},
+		],
 		messages: {
 			builder:
-				'Import `drizzle-orm` only inside `packages/db` - a query belongs on a repository, and a caller joins one by passing an `Executor` (AGENTS.md).',
+				'Import `drizzle-orm` only inside {{allowed}} - a query belongs on a repository, and a caller joins one by passing an `Executor` (AGENTS.md).',
 			schemas:
-				'Import `@telecord/db/schemas` only inside `packages/db` - reach a table through its repository rather than building the query here (AGENTS.md).',
+				'Import `{{schemas}}` only inside {{allowed}} - reach a table through its repository rather than building the query here (AGENTS.md).',
 		},
 	},
 	create(context) {
+		const { schemas, allowedIn } = requireOptions(context, 'no-raw-database-access');
 		const path = context.filename.replaceAll('\\', '/');
 
-		if (
-			path.includes(DATABASE_PACKAGE_SOURCE) ||
-			path.includes(DATABASE_FIXTURE_SOURCE) ||
-			TEST_FILE.test(path)
-		) {
+		if (findRoot(path, allowedIn) || TEST_FILE.test(path)) {
 			return {};
 		}
+
+		const schemasModule = new RegExp(`^${escapeRegExp(schemas)}(/|$)`);
+		const allowed = allowedIn.map((glob) => `\`${glob}\``).join(' or ');
 
 		return {
 			ImportDeclaration(node) {
@@ -1288,13 +1372,17 @@ const noRawDatabaseAccess = {
 				const source = node.source.value;
 
 				if (DRIZZLE_QUERY_BUILDER.test(source) && !DRIZZLE_DRIVER.test(source)) {
-					context.report({ node: node.source, messageId: 'builder' });
+					context.report({ node: node.source, messageId: 'builder', data: { allowed } });
 
 					return;
 				}
 
-				if (DATABASE_SCHEMAS.test(source) && !isNamespaceImport(node)) {
-					context.report({ node: node.source, messageId: 'schemas' });
+				if (schemasModule.test(source) && !isNamespaceImport(node)) {
+					context.report({
+						node: node.source,
+						messageId: 'schemas',
+						data: { allowed, schemas },
+					});
 				}
 			},
 		};
