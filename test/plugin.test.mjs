@@ -221,6 +221,27 @@ ruleTester.run(
 	},
 );
 
+ruleTester.run(
+	'no-cross-domain-internals when every internal is composable',
+	plugin.rules['no-cross-domain-internals'],
+	{
+		valid: withOptions(
+			{ domainRoots: ['src/domains'], internals: ['service'], composable: ['service'] },
+			[
+				{
+					code: "import { charge } from '../payments/service';",
+					filename: 'src/domains/billing/service.ts',
+				},
+				{
+					code: "import { charge } from '../payments/';",
+					filename: 'src/domains/billing/service.ts',
+				},
+			],
+		),
+		invalid: [],
+	},
+);
+
 it('requires options on every layout rule', () => {
 	for (const rule of [
 		'consistent-import-paths',

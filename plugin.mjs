@@ -1030,6 +1030,11 @@ const noCrossDomainInternals = {
 		const module = nested.length === 0 ? domainFile?.replace(/\.[^.]+$/, '') : undefined;
 		const composes = composable.includes(module);
 		const banned = composes ? internals.filter((name) => name !== module) : internals;
+
+		if (banned.length === 0) {
+			return {};
+		}
+
 		const pattern = new RegExp(`^\\.\\./[^/.]+/(${banned.map(escapeRegExp).join('|')})$`);
 
 		return {
