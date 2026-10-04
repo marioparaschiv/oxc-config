@@ -1,11 +1,8 @@
 import { afterAll, beforeAll, expect, it } from 'vitest';
-import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 
-import { resolveBin } from '../lib/resolve-bin.mjs';
+import { spawnBin } from '../lib/resolve-bin.mjs';
 import { linkPackage } from './link-package.mjs';
-
-const oxlint = resolveBin('oxlint');
 
 const consumer = join(import.meta.dirname, 'fixtures/consumer');
 const presetsConsumer = join(import.meta.dirname, 'fixtures/presets-consumer');
@@ -23,14 +20,7 @@ afterAll(() => {
 });
 
 function lint(cwd) {
-	const result = spawnSync(
-		process.execPath,
-		[oxlint, '--type-aware', '--format', 'json', 'src'],
-		{
-			cwd,
-			encoding: 'utf8',
-		},
-	);
+	const result = spawnBin('oxlint', ['--type-aware', '--format', 'json', 'src'], { cwd });
 
 	const { diagnostics } = JSON.parse(result.stdout);
 

@@ -1,11 +1,8 @@
 import { afterAll, beforeAll, expect, it } from 'vitest';
-import { spawnSync } from 'node:child_process';
 import { join } from 'node:path';
 
-import { resolveBin } from '../lib/resolve-bin.mjs';
+import { spawnBin } from '../lib/resolve-bin.mjs';
 import { linkPackage } from './link-package.mjs';
-
-const commitlint = resolveBin('@commitlint/cli', 'commitlint');
 
 const consumer = join(import.meta.dirname, 'fixtures/commitlint-consumer');
 
@@ -20,11 +17,7 @@ afterAll(() => {
 });
 
 function lintMessage(message) {
-	return spawnSync(process.execPath, [commitlint], {
-		cwd: consumer,
-		input: message,
-		encoding: 'utf8',
-	});
+	return spawnBin('@commitlint/cli', [], { cwd: consumer, input: message }, 'commitlint');
 }
 
 it('rejects a message without a type', () => {

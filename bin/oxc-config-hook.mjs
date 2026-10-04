@@ -6,7 +6,7 @@ import { readFileSync, realpathSync, statSync } from 'node:fs';
 import { spawnSync } from 'node:child_process';
 import { parseArgs } from 'node:util';
 
-import { resolveBin } from '../lib/resolve-bin.mjs';
+import { spawnBin } from '../lib/resolve-bin.mjs';
 
 const MAX_BUFFER = 64 * 1024 * 1024;
 const MAX_REPORT = 12_000;
@@ -26,7 +26,13 @@ function run(command, args, cwd) {
 }
 
 function runTool(name, args, cwd) {
-	return run(process.execPath, [resolveBin(name), ...args], cwd);
+	const result = spawnBin(name, args, { cwd, maxBuffer: MAX_BUFFER });
+
+	if (result.error) {
+		throw result.error;
+	}
+
+	return result;
 }
 
 function git(args, cwd) {
