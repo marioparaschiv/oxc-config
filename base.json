@@ -209,7 +209,6 @@
 	"env": {
 		"builtin": true
 	},
-	"ignorePatterns": ["dist", "*.gen.ts"],
 	"overrides": [
 		{
 			"files": ["**/tests/**", "**/*.test.ts", "**/*.test.tsx"],

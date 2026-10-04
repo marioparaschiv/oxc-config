@@ -41,7 +41,7 @@ const jsxNoConditionalLeak = {
 	},
 };
 
-const isPromiseAll = (node) => {
+function isPromiseAll(node) {
 	const { callee } = node;
 
 	return (
@@ -52,7 +52,7 @@ const isPromiseAll = (node) => {
 		callee.property.type === 'Identifier' &&
 		callee.property.name === 'all'
 	);
-};
+}
 
 const noAwaitInPromiseAll = {
 	meta: {
@@ -144,7 +144,7 @@ const noChainedTypeAssertions = {
 const WIDE_ANNOTATION_TYPES = new Set(['TSUnknownKeyword', 'TSAnyKeyword']);
 
 /** A `const`/`let` declarator whose annotation widens to `unknown`/`any`, keyed by binding name. */
-const widenedBindingName = (declarator) => {
+function widenedBindingName(declarator) {
 	if (declarator.id.type !== 'Identifier') {
 		return null;
 	}
@@ -152,7 +152,7 @@ const widenedBindingName = (declarator) => {
 	const annotation = declarator.id.typeAnnotation?.typeAnnotation;
 
 	return annotation && WIDE_ANNOTATION_TYPES.has(annotation.type) ? declarator.id.name : null;
-};
+}
 
 const noWidenThenAssert = {
 	meta: {
@@ -168,11 +168,13 @@ const noWidenThenAssert = {
 			VariableDeclarator(node) {
 				const name = widenedBindingName(node);
 
-				if (name) {
-					const annotation = node.id.typeAnnotation.typeAnnotation;
-
-					widened.set(name, annotation.type === 'TSAnyKeyword' ? 'any' : 'unknown');
+				if (!name) {
+					return;
 				}
+
+				const annotation = node.id.typeAnnotation.typeAnnotation;
+
+				widened.set(name, annotation.type === 'TSAnyKeyword' ? 'any' : 'unknown');
 			},
 			TSAsExpression(node) {
 				if (node.expression.type !== 'Identifier') {
@@ -246,7 +248,7 @@ const FUNCTION_LIKE_PARENTS = new Set([
  * argument, or the annotation of a function parameter or return type. Plain
  * variable annotations (`const x: { a: number }`) are allowed.
  */
-const isInlineObjectTypeBanned = (node) => {
+function isInlineObjectTypeBanned(node) {
 	const { parent } = node;
 
 	if (parent.type === 'TSTypeParameterInstantiation') {
@@ -264,7 +266,7 @@ const isInlineObjectTypeBanned = (node) => {
 	}
 
 	return FUNCTION_LIKE_PARENTS.has(grandparent.type);
-};
+}
 
 const noInlineObjectType = {
 	meta: {
@@ -460,7 +462,7 @@ const maxCommentLength = {
 
 				let group = [];
 
-				const flush = () => {
+				function flush() {
 					if (group.length === 0) {
 						return;
 					}
@@ -479,7 +481,7 @@ const maxCommentLength = {
 					}
 
 					group = [];
-				};
+				}
 
 				for (const comment of commentable) {
 					const previous = group[group.length - 1];
@@ -516,7 +518,7 @@ const maxCommentLength = {
  * parenthesized types, union members, and non-parameterized top-level aliases.
  * `aliasMap` maps alias names to their `typeAnnotation`; `seen` guards cycles.
  */
-const resolvesTo = (type, predicate, aliasMap, seen = new Set()) => {
+function resolvesTo(type, predicate, aliasMap, seen = new Set()) {
 	if (!type) {
 		return false;
 	}
@@ -550,9 +552,9 @@ const resolvesTo = (type, predicate, aliasMap, seen = new Set()) => {
 	}
 
 	return false;
-};
+}
 
-const collectAliasMap = (program) => {
+function collectAliasMap(program) {
 	const aliasMap = new Map();
 
 	for (const statement of program.body) {
@@ -569,7 +571,7 @@ const collectAliasMap = (program) => {
 	}
 
 	return aliasMap;
-};
+}
 
 const FUNCTION_LIKE_VISITORS = [
 	'FunctionDeclaration',
@@ -592,7 +594,7 @@ const isPromiseWrapper = (type) =>
 	(type.typeName.name === 'Promise' || type.typeName.name === 'PromiseLike') &&
 	type.typeArguments?.params.length === 1;
 
-const returnResolvesToUnknown = (type, aliasMap, seen = new Set()) => {
+function returnResolvesToUnknown(type, aliasMap, seen = new Set()) {
 	if (resolvesTo(type, isUnknownKeyword, aliasMap, seen)) {
 		return true;
 	}
@@ -622,7 +624,7 @@ const returnResolvesToUnknown = (type, aliasMap, seen = new Set()) => {
 	}
 
 	return false;
-};
+}
 
 const withFunctionLikeVisitors = (handler) =>
 	Object.fromEntries(FUNCTION_LIKE_VISITORS.map((name) => [name, handler]));
@@ -646,7 +648,7 @@ const STATEMENT_WRAPPERS = new Set([
  * Start offset of the statement a function belongs to, so a comment leading
  * `export const fn = (...)` is still seen as attached to the function itself.
  */
-const statementStart = (node) => {
+function statementStart(node) {
 	let outermost = node;
 
 	for (
@@ -658,7 +660,7 @@ const statementStart = (node) => {
 	}
 
 	return outermost.start;
-};
+}
 
 /**
  * A type-predicate return (`value is T`, `asserts value is T`) makes `unknown`
@@ -674,7 +676,7 @@ const unknownJustifications = (program) =>
  * before `target`. Only whitespace may separate a leading comment from the
  * statement, so an unrelated comment further up the file never exempts anything.
  */
-const isJustified = (context, comments, functionNode, target) => {
+function isJustified(context, comments, functionNode, target) {
 	const start = statementStart(functionNode);
 	const { text } = context.sourceCode;
 
@@ -687,7 +689,7 @@ const isJustified = (context, comments, functionNode, target) => {
 
 		return text.slice(comment.end, gapEnd).trim() === '';
 	});
-};
+}
 
 const noUnknownReturns = {
 	meta: {
@@ -727,7 +729,7 @@ const noUnknownReturns = {
  * Yields the type annotation of each parameter across the param-pattern shapes
  * a function-like node can hold (plain binding, parameter property, rest).
  */
-const paramTypeEntries = (params) => {
+function paramTypeEntries(params) {
 	const entries = [];
 
 	for (const param of params) {
@@ -741,7 +743,7 @@ const paramTypeEntries = (params) => {
 	}
 
 	return entries;
-};
+}
 
 const isObjectKeyword = (type) => type.type === 'TSObjectKeyword';
 
@@ -830,11 +832,11 @@ const noUnsafeDictionaryType = {
 	create(context) {
 		let aliasMap = new Map();
 
-		const reportIfUnsafe = (valueType, reportNode) => {
+		function reportIfUnsafe(valueType, reportNode) {
 			if (valueType && resolvesTo(valueType, isUnsafeDictionaryValue, aliasMap)) {
 				context.report({ node: reportNode, messageId: 'unsafe' });
 			}
-		};
+		}
 
 		return {
 			Program(node) {
@@ -869,7 +871,7 @@ const requireBlockExceptEmptyReturn = {
 		},
 	},
 	create(context) {
-		const isAllowedReturn = (node) => {
+		function isAllowedReturn(node) {
 			if (node.type !== 'ReturnStatement') {
 				return false;
 			}
@@ -885,9 +887,9 @@ const requireBlockExceptEmptyReturn = {
 				(argument.type === 'Literal' && argument.value === null) ||
 				argument.type === 'NullLiteral'
 			);
-		};
+		}
 
-		const check = (branch) => {
+		function check(branch) {
 			if (!branch || branch.type === 'BlockStatement') {
 				return;
 			}
@@ -902,7 +904,7 @@ const requireBlockExceptEmptyReturn = {
 				messageId: 'requireBlock',
 				fix: (fixer) => fixer.replaceText(branch, `{ ${textOf(context, branch)} }`),
 			});
-		};
+		}
 
 		return {
 			IfStatement(node) {
@@ -1100,7 +1102,7 @@ const kebabCaseFilename = {
 	},
 };
 
-const resolveImport = (fromDirectory, specifier) => {
+function resolveImport(fromDirectory, specifier) {
 	const segments = fromDirectory.split('/');
 
 	for (const segment of specifier.split('/')) {
@@ -1112,7 +1114,7 @@ const resolveImport = (fromDirectory, specifier) => {
 	}
 
 	return segments.join('/');
-};
+}
 
 const consistentImportPaths = {
 	meta: {
@@ -1146,7 +1148,7 @@ const consistentImportPaths = {
 		const relativeMatch = findRoot(path, relativeRoots);
 		const aliasMatch = relativeMatch ? null : findRoot(path, aliasRoots);
 
-		const check = (node) => {
+		function check(node) {
 			const source = node.source;
 
 			if (!source || typeof source.value !== 'string') {
@@ -1186,7 +1188,7 @@ const consistentImportPaths = {
 				data: { alias, expected },
 				fix: (fixer) => fixer.replaceText(source, `'${expected}'`),
 			});
-		};
+		}
 
 		return {
 			ImportDeclaration: check,
@@ -1323,8 +1325,7 @@ const DRIZZLE_DRIVER = /^drizzle-orm\/(node-postgres|postgres-js|neon-serverless
 const isTypeSpecifier = (specifier) => specifier.importKind === 'type';
 
 // Building a client takes the whole schema as one opaque value
-// (`drizzle({ client, schema })`, `drizzleAdapter(db, { schema })`), which is
-// how the search indexer and the auth adapter get an injectable database.
+// (`drizzle({ client, schema })`, `drizzleAdapter(db, { schema })`).
 // Naming individual tables is what turns an import into a query.
 const isNamespaceImport = (node) =>
 	node.specifiers.length === 1 && node.specifiers[0].type === 'ImportNamespaceSpecifier';

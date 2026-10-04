@@ -16,6 +16,8 @@
 		"react.json",
 		"jsdoc.json",
 		"plugin.mjs",
+		"commitlint.mjs",
+		"oxfmtrc.json",
 		"bin",
 		"lib"
 	],
@@ -25,12 +27,19 @@
 		"./react.json": "./react.json",
 		"./jsdoc.json": "./jsdoc.json",
 		"./plugin": "./plugin.mjs",
+		"./commitlint": "./commitlint.mjs",
+		"./oxfmtrc.json": "./oxfmtrc.json",
 		"./package.json": "./package.json"
 	},
 	"publishConfig": {
 		"access": "public"
 	},
 	"scripts": {
+		"prepare": "lefthook install --reset-hooks-path",
+		"lint": "oxlint --type-aware --disable-nested-config",
+		"format": "oxfmt -c oxfmtrc.json",
+		"format:check": "oxfmt -c oxfmtrc.json --check",
+		"check": "node bin/oxc-config-check.mjs base.json react.json jsdoc.json .oxlintrc.json",
 		"test": "vitest run"
 	},
 	"dependencies": {
@@ -42,6 +51,7 @@
 		"eslint-plugin-unicorn": "^76.0.0"
 	},
 	"devDependencies": {
+		"lefthook": "2.1.9",
 		"oxfmt": "^0.71.0",
 		"oxlint": "^1.86.0",
 		"oxlint-tsgolint": "^7.0.2003",
