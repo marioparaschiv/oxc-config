@@ -167,8 +167,13 @@ it('skips the stop pass when the transcript cannot be read', () => {
 
 it('skips files matched by the repository ignorePatterns on stop', () => {
 	write('src/schema.gen.ts', WITH_ERROR);
+	write('src/broken.ts', WITH_ERROR);
 
-	expect(stop()).toBe('');
+	const { decision, reason } = JSON.parse(stop());
+
+	expect(decision).toBe('block');
+	expect(reason).toContain('src/broken.ts:2:2: error eslint(no-debugger)');
+	expect(reason).not.toContain('schema.gen.ts');
 });
 
 it('lints with the ratchet config when given, still honouring the repository ignorePatterns', () => {
