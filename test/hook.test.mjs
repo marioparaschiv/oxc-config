@@ -13,12 +13,12 @@ import { spawnSync } from 'node:child_process';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { linkPackage } from './link-package.mjs';
+import { linkPackage, root as packageRoot } from './link-package.mjs';
 
 // A stop pass runs oxfmt and type-aware oxlint for real, several times in the ratchet test.
 vi.setConfig({ testTimeout: 20_000 });
 
-const hook = join(import.meta.dirname, '../bin/oxc-config-hook.mjs');
+const hook = join(packageRoot, 'bin/oxc-config-hook.mjs');
 
 const CLEAN = 'export function one(): number {\n\treturn 1;\n}\n';
 const UNFORMATTED = 'export function one(): number {\nreturn 1\n}\n';

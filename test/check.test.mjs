@@ -2,7 +2,8 @@ import { spawnSync } from 'node:child_process';
 import { expect, it } from 'vitest';
 import { join } from 'node:path';
 
-const root = join(import.meta.dirname, '..');
+import { root } from './link-package.mjs';
+
 const check = join(root, 'bin/oxc-config-check.mjs');
 
 const runCheck = (cwd, configs) =>
