@@ -35,7 +35,7 @@
 		"access": "public"
 	},
 	"scripts": {
-		"prepare": "lefthook install --reset-hooks-path",
+		"prepare": "git rev-parse --git-dir > /dev/null 2>&1 || exit 0; lefthook install --reset-hooks-path",
 		"lint": "oxlint --type-aware --disable-nested-config",
 		"format": "oxfmt -c oxfmtrc.json",
 		"format:check": "oxfmt -c oxfmtrc.json --check",
