@@ -1,6 +1,6 @@
 {
 	"name": "@marioparaschiv/oxc-config",
-	"version": "0.0.0",
+	"version": "0.1.0",
 	"description": "Shared oxlint and oxfmt configuration with custom lint rules",
 	"license": "MIT",
 	"repository": {
