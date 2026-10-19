@@ -1,45 +1,20 @@
-import {
-	mkdirSync,
-	mkdtempSync,
-	readFileSync,
-	realpathSync,
-	rmSync,
-	statSync,
-	utimesSync,
-	writeFileSync,
-} from 'node:fs';
+import { readFileSync, rmSync, statSync, utimesSync, writeFileSync } from 'node:fs';
 import { afterEach, beforeEach, expect, it, vi } from 'vitest';
 import { spawnSync } from 'node:child_process';
-import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
-import { linkPackage, root as packageRoot } from './link-package.mjs';
+import { CLEAN, UNFORMATTED, WITH_CONSOLE, WITH_ERROR, createRepository } from './repository.mjs';
+import { root as packageRoot } from './link-package.mjs';
 
 // A stop pass runs oxfmt and type-aware oxlint for real, several times in the ratchet test.
 vi.setConfig({ testTimeout: 20_000 });
 
 const hook = join(packageRoot, 'bin/oxc-config-hook.mjs');
 
-const CLEAN = 'export function one(): number {\n\treturn 1;\n}\n';
-const UNFORMATTED = 'export function one(): number {\nreturn 1\n}\n';
-const WITH_ERROR = 'export function two(): number {\n\tdebugger;\n\n\treturn 2;\n}\n';
-const WITH_CONSOLE =
-	"export function three(): number {\n\tconsole.log('three');\n\n\treturn 3;\n}\n";
-
 let base;
 let root;
 let transcript;
 let sessionStartSeconds;
-
-function git(...args) {
-	const result = spawnSync(
-		'git',
-		['-c', 'user.name=test', '-c', 'user.email=test@example.com', ...args],
-		{ cwd: root, encoding: 'utf8' },
-	);
-
-	expect(result.status, result.stderr).toBe(0);
-}
 
 // Session files are stamped after the transcript's birth and pre-session files well before it,
 // since birth time itself cannot be set.
@@ -82,33 +57,7 @@ function stop(args) {
 }
 
 beforeEach(() => {
-	base = realpathSync(mkdtempSync(join(tmpdir(), 'oxc-config-hook-')));
-	root = join(base, 'repository');
-	mkdirSync(join(root, 'src'), { recursive: true });
-
-	writeFileSync(join(root, '.gitignore'), 'node_modules\n');
-	writeFileSync(join(root, '.oxfmtrc.json'), '{ "useTabs": true, "singleQuote": true }\n');
-	writeFileSync(
-		join(root, '.oxlintrc.json'),
-		JSON.stringify({
-			extends: ['./node_modules/@marioparaschiv/oxc-config/base.json'],
-			ignorePatterns: ['*.gen.ts'],
-		}),
-	);
-	writeFileSync(
-		join(root, 'ratchet.json'),
-		JSON.stringify({ extends: ['./.oxlintrc.json'], rules: { 'no-console': 'error' } }),
-	);
-	writeFileSync(
-		join(root, 'tsconfig.json'),
-		JSON.stringify({ compilerOptions: { strict: true, noEmit: true }, include: ['src'] }),
-	);
-	writeFileSync(join(root, 'src/committed.ts'), CLEAN);
-
-	git('init', '--quiet');
-	git('add', '.');
-	git('-c', 'commit.gpgsign=false', 'commit', '--quiet', '--no-verify', '-m', 'init');
-	linkPackage(root);
+	({ base, root } = createRepository());
 
 	transcript = join(base, 'transcript.jsonl');
 	writeFileSync(transcript, '');

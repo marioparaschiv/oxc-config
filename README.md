@@ -1,6 +1,6 @@
 # @marioparaschiv/oxc-config
 
-Shared oxlint and oxfmt configuration with custom lint rules, a commitlint config and a Claude Code hook.
+Shared oxlint and oxfmt configuration with custom lint rules, a commitlint config, a Claude Code hook and a Pi extension.
 
 ## Install
 
@@ -171,6 +171,36 @@ Add both hooks to `.claude/settings.json`:
 ```
 
 To lint session changes against a stricter config than the rest of the repository, pass it to the Stop hook with `npx oxc-config-hook --ratchet .oxlint/ratchet.json`. The path is relative to the repository root.
+
+## Pi extension
+
+The package is also a [Pi](https://pi.dev) package whose extension does the same work with Pi's own events:
+
+| Pi event                                         | Behaviour                                                                                                                                                                                                                                                                               |
+| ------------------------------------------------ | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `tool_result` of a successful `edit` or `write`  | Formats that file with oxfmt.                                                                                                                                                                                                                                                           |
+| `agent_before_settle` after a run that completed | Formats every file git reports as changed since the session started, runs `oxlint --type-aware --fix` on them and adds the remaining errors to the session as a message, which makes the agent continue and fix them. Warnings are shown as a notification and do not continue the run. |
+
+The session starts at the timestamp in the Pi session header. To stop a lint error the agent cannot fix from looping, the extension continues at most 3 times for each prompt.
+
+Load it from your dependency in `.pi/settings.json`. Pi resolves relative package paths from the `.pi` directory and loads local packages without installing them:
+
+```json
+{
+	"packages": ["../node_modules/@marioparaschiv/oxc-config"]
+}
+```
+
+To lint session changes against a stricter config, set `oxcConfig.ratchet` in the same file. The path is relative to the repository root:
+
+```json
+{
+	"packages": ["../node_modules/@marioparaschiv/oxc-config"],
+	"oxcConfig": { "ratchet": ".oxlint/ratchet.json" }
+}
+```
+
+Pi reads project settings only after you trust the project.
 
 ## Releasing
 
